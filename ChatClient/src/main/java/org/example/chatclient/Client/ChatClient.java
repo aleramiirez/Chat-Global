@@ -101,11 +101,15 @@ public class ChatClient extends Application {
     public void start(Stage primaryStage) {
         messageArea.setMaxWidth(500);
         messageArea.setEditable(false);
+        messageArea.setStyle("-fx-control-inner-background: #0FC2C0;");
 
         inputBox.setMaxWidth(400);
+        inputBox.setStyle("-fx-background-color: #0FC2C0;");
 
         sendButton = new Button("Enviar");
         sendPhotoButton = new Button("Enviar Foto");
+        sendButton.setStyle("-fx-background-color: #0CABA8;");
+        sendPhotoButton.setStyle("-fx-background-color: #0CABA8;");
 
         sendButton.setMinWidth(100);
         sendPhotoButton.setMinWidth(100);
@@ -130,6 +134,8 @@ public class ChatClient extends Application {
         BorderPane root = new BorderPane();
         root.setCenter(new VBox(35, messageArea, inputContainer));
         root.setPadding(new Insets(20));
+
+        root.setStyle("-fx-background-color: #015958;");
 
         // put everything on screen
         Scene scene = new Scene(root, 550, 300);
