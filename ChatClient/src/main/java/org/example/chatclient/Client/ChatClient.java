@@ -23,12 +23,25 @@ import java.util.Scanner;
 
 public class ChatClient extends Application {
 
+    // Creacion de un objeto DatagramSocket (socket) para la comunicacion UDP
     private static final DatagramSocket socket;
+
+    // Puerto en el cual el servidor espera recibir mensajes de este cliente
     private static final int SERVER_PORT = 5010;
+
+    // Puerto en el cual este cliente espera recibir mensajes del servidor
     private static final int CLIENT_PORT = 6010;
 
+    // Variable para almacenar la direccion IP del servidor
+    private static final InetAddress address;
+
+    // Bloque estatico, que se ejecuta una sola vez cuando la clase es cargada
     static {
         try {
+
+            // Creacion de un objeto DatagramSocket y asignacion a la variable socket.
+            // Inicializa un socket UDP en el lado del cliente, que se utilizara para enviar
+            // y recibir datagramas (paquetes de datos) a traves de la red utilizando el protocolo UDP
             socket = new DatagramSocket();
             //socket = new DatagramSocket(CLIENT_PORT);
         } catch (SocketException e) {
@@ -36,21 +49,32 @@ public class ChatClient extends Application {
         }
     }
 
-    private static final InetAddress address;
-
+    // Inicializacion estatica para asegurar que la variable se inicialice antes de su uso
     static {
         try {
             //address = InetAddress.getByName("13.80.252.23");
+
+            // Crear un objeto InetAddress con la direccion IP del servidor
             address = InetAddress.getByName("localhost");
         } catch (UnknownHostException e) {
             throw new RuntimeException(e);
         }
     }
 
+    // Area de texto para mostrar los mensajes
     private static final TextArea messageArea = new TextArea();
+
+    // Caja de texto para la entrada de mensajes
     private static final TextField inputBox = new TextField();
+
+    // Botón para enviar mensajes de texto
     private Button sendButton;
+
+    // Botón para enviar fotos
     private Button sendPhotoButton;
+
+
+    // Variable para almacenar el nombre de usuario del cliente
     private static String username;
 
     public static void main(String[] args) throws IOException {
@@ -60,16 +84,17 @@ public class ChatClient extends Application {
 
         username = sc.nextLine();
 
+        // Validar que el nombre de usuario no esté en uso
         while (!validateUsername(username)) {
             System.out.println("El nombre de usuario ya está en uso. Por favor, elija otro nombre.");
             username = sc.nextLine();
         }
 
-        // thread for receiving messages
+        // Crear un hilo para recibir mensajes del servidor
         ClientThread clientThread = new ClientThread(socket, messageArea);
         clientThread.start();
 
-        // send initialization message to the server
+        // Enviar un mensaje de inicialización al servidor
         byte[] uuid = ("init;" + username).getBytes();
         DatagramPacket initialize = new DatagramPacket(uuid, uuid.length, address, SERVER_PORT);
         socket.send(initialize);
@@ -177,7 +202,7 @@ public class ChatClient extends Application {
         if (file != null) {
             try {
                 // Leer la imagen como un arreglo de bytes
-                byte[] imageBytes = Files.readAllBytes(((File) file).toPath());
+                byte[] imageBytes = Files.readAllBytes(file.toPath());
 
                 // Enviar la imagen al servidor
                 DatagramPacket photoPacket = new DatagramPacket(imageBytes, imageBytes.length, address, SERVER_PORT);

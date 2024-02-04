@@ -92,21 +92,17 @@ public class Server extends Application {
         }
     }
 
-    // Representa el bucle principal del servidor que se ejecuta continuamente para manejar los paquetes entrantes
     private void runServer() {
-
         // Se crea un arreglo de bytes con una capacidad de 1024 bytes para almacenar los datos recibidos.
         byte[] incomingData = new byte[1024];
 
         while (true) {
-
             // Se utilizara para recibir datos del cliente. El paquete se configura para almacenar datos
             // en incomingData
             DatagramPacket packet = new DatagramPacket(incomingData, incomingData.length);
 
             try {
-
-                // Se intenta recibir el paquete del cliente a traves del socket del servidor
+                // Se intenta recibir el paquete del cliente a través del socket del servidor
                 socket.receive(packet);
             } catch (IOException e) {
                 log("Error al recibir datos: " + e.getMessage());
@@ -115,27 +111,22 @@ public class Server extends Application {
             // Se convierten los datos del paquete en una cadena String
             String message = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
 
-            // Se registra el mensaje en el area de registro del servidor
-            log("Mensaje recibido: " + message);
-
             // Si el mensaje contiene la cadena "STOP", se para el servidor
-            if (message.contains("STOP")) {
-
-                // Se registra el mensaje en el area de registro del servidor
+            if (message.endsWith(": STOP")) {
+                // Se registra el mensaje en el área de registro del servidor
                 log("Servidor detenido por solicitud del cliente.");
 
                 // Se para el servidor
                 stopServer();
 
-                // Se cierra la aplicacion
+                // Se cierra la aplicación
                 Platform.exit();
             }
 
-            // Si el mensaje comienza con validate; valida que el nombre de usuario no este registrado en el chat
+            // Si el mensaje comienza con validate; valida que el nombre de usuario no esté registrado en el chat
             else if (message.startsWith("validate;")) {
-
-                // Se registra el mensaje en el area de registro del servidor
-                log("Mensaje de validación recibido: " + message);
+                // Se registra el mensaje en el área de registro del servidor
+                log("Usuario conectado correctamente: " + message.substring(9));
 
                 // Se obtiene el nombre de usuario
                 String requestedUsername = message.substring(9);
@@ -146,8 +137,7 @@ public class Server extends Application {
 
             // Si el mensaje comienza con disconnect; elimina el nombre de usuario de la lista
             else if (message.contains("disconnect;")) {
-
-                // Se registra el mensaje en el area de registro del servidor
+                // Se registra el mensaje en el área de registro del servidor
                 log("Mensaje de desconexión recibido: " + message);
 
                 // Se divide la cadena para poder obtener el nombre de usuario
@@ -160,36 +150,40 @@ public class Server extends Application {
                 registeredUsernames.remove(disconnectedUser);
             }
 
-            // Si el mensaje empieza por init; entra un nuevo usuario al chat
+            // Si el mensaje comienza con init; entra un nuevo usuario al chat
             else if (message.startsWith("init;")) {
-
-                // Se registra el mensaje en el area de registro del servidor
-                log("Mensaje de inicialización recibido: " + message);
+                // Se registra el mensaje en el área de registro del servidor
+                String newUser = message.substring(5);
+                log(newUser + " está conectado.");
 
                 // Se añade el puerto del cliente a la lista users
                 users.add(packet.getPort());
 
-                // Se añade la direccion IP a la lista address
+                // Se añade la dirección IP a la lista address
                 address = packet.getAddress();
             }
 
+
             // Si el mensaje empieza con img; se asume que es una imagen
             else if (message.startsWith("img;")) {
-
-                // Se registra el mensaje en el area de registro del servidor
+                // Se registra el mensaje en el área de registro del servidor
                 log("Mensaje de imagen recibido: " + message);
 
-                // Llama al metodo handleImageMessage() para manejar el mensaje de imagen
+                // Llama al método handleImageMessage() para manejar el mensaje de imagen
                 handleImageMessage(packet);
             }
 
             // Si no es ninguna de las anteriores se asume que es un mensaje de texto normal
             else {
-                // Reenvia el mensaje todos los clientes conectados menos al remitente
+                // Reenvía el mensaje a todos los clientes conectados menos al remitente
                 forwardTextMessage(packet);
+
+                // Se registra el mensaje en el área de registro del servidor
+                log(message);
             }
         }
     }
+
 
     // Registra mensajes en el area de registro del servidor
     private void log(String message) {
@@ -260,7 +254,7 @@ public class Server extends Application {
         System.arraycopy(packet.getData(), 0, imageData, 0, packet.getLength());
 
         // Guardar la imagen en la carpeta Descargas
-        String fileName = "C:\\Users\\aleja\\Downloads" + System.currentTimeMillis() + ".png";
+        String fileName = "C:\\Users\\danie\\Downloads" + System.currentTimeMillis() + ".png";
         Path imagePath = Path.of(fileName);
 
         try {
