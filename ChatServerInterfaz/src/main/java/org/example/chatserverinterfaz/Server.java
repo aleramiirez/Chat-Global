@@ -6,17 +6,14 @@ import javafx.scene.Scene;
 import javafx.scene.control.TextArea;
 import javafx.stage.Stage;
 
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketException;
+import java.io.*;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.CountDownLatch;
+
 
 public class Server extends Application {
 
@@ -26,6 +23,9 @@ public class Server extends Application {
     // Puerto al cual el servidor reenvia mensajes a los clientes
     private static final int FORWARD_PORT = 6010;
 
+    // Utilizado para esperar a que todos los hilos terminen antes de cerrar el socket
+    private CountDownLatch shutdownLatch = new CountDownLatch(1);
+
     // Se utiliza para la comunicacion a traves de datagramas. Envia o recibe paquetes de datos a traves de UDP
     private DatagramSocket socket;
 
@@ -33,13 +33,13 @@ public class Server extends Application {
     private Set<String> registeredUsernames = new HashSet<>();
 
     // Almacena los puertos de los usuarios conectados al servidor
-    private ArrayList<Integer> users = new ArrayList<>();
+    private static ArrayList<Integer> users = new ArrayList<>();
 
     // Este objeto se utiliza para mostrar mensajes en la interfaz grafica del servidor
     private TextArea logTextArea;
 
     // Almacena la direccion IP del cliente cuando se inicia la comunicacion
-    private InetAddress address;
+    private static List<InetAddress> clientAddresses = new ArrayList<>();
 
     public static void main(String[] args) {
         launch(args);
@@ -70,10 +70,12 @@ public class Server extends Application {
             socket = new DatagramSocket(PORT);
         } catch (SocketException e) {
             log("Error al iniciar el servidor en el puerto " + PORT);
+            System.out.println("Error al iniciar el servidor en el puerto " + PORT);
             Platform.exit();
         }
 
         log("Servidor iniciado en el puerto " + PORT);
+        System.out.println("Servidor iniciado en el puerto " + PORT);
 
         // Se ejecuta un hilo para poder atender a multiples clientes simultaneamente sin bloquearse
         Thread serverThread = new Thread(this::runServer);
@@ -85,9 +87,16 @@ public class Server extends Application {
         serverThread.start();
     }
 
-    // Si el socket no es nulo y no esta cerrado cierra el servidor
     private void stopServer() {
         if (socket != null && !socket.isClosed()) {
+            // Se establece el latch para permitir que los hilos completen sus operaciones
+            shutdownLatch.countDown();
+            // Se espera a que todos los hilos completen antes de cerrar el socket
+            try {
+                shutdownLatch.await();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             socket.close();
         }
     }
@@ -114,7 +123,11 @@ public class Server extends Application {
             // Si el mensaje contiene la cadena "STOP", se para el servidor
             if (message.endsWith(": STOP")) {
                 // Se registra el mensaje en el área de registro del servidor
-                log("Servidor detenido por solicitud del cliente.");
+                log("Servidor detenido por solicitud del cliente");
+                System.out.println("Servidor detenido por solicitud del cliente");
+
+                // Se establece el latch para permitir que los hilos completen sus operaciones
+                shutdownLatch.countDown();
 
                 // Se para el servidor
                 stopServer();
@@ -125,8 +138,7 @@ public class Server extends Application {
 
             // Si el mensaje comienza con validate; valida que el nombre de usuario no esté registrado en el chat
             else if (message.startsWith("validate;")) {
-                // Se registra el mensaje en el área de registro del servidor
-                log("Usuario conectado correctamente: " + message.substring(9));
+
 
                 // Se obtiene el nombre de usuario
                 String requestedUsername = message.substring(9);
@@ -135,7 +147,6 @@ public class Server extends Application {
                 handleValidation(requestedUsername, packet.getAddress(), packet.getPort());
             }
 
-            // Si el mensaje comienza con disconnect; elimina el nombre de usuario de la lista
             else if (message.contains("disconnect;")) {
                 // Se registra el mensaje en el área de registro del servidor
                 log("Mensaje de desconexión recibido: " + message);
@@ -148,19 +159,57 @@ public class Server extends Application {
 
                 // Elimina al usuario desconectado de la lista
                 registeredUsernames.remove(disconnectedUser);
+
+                String newUser = message.substring(11);
+
+                // Modificar para reenviar el mensaje de inicialización a todos los usuarios conectados
+                for (int forwardPort : users) {
+                    if (forwardPort != packet.getPort()) {
+                        // Construye un nuevo paquete que contiene el mensaje de inicialización y está destinado al
+                        // cliente actual
+                        byte[] activeUser = (newUser + " ha abandonado el chat!").getBytes();
+                        DatagramPacket forward =
+                                new DatagramPacket(activeUser, activeUser.length, packet.getAddress(), forwardPort);
+
+                        try {
+                            // Envia el paquete al cliente a través del socket del servidor
+                            socket.send(forward);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
             }
 
             // Si el mensaje comienza con init; entra un nuevo usuario al chat
             else if (message.startsWith("init;")) {
                 // Se registra el mensaje en el área de registro del servidor
                 String newUser = message.substring(5);
-                log(newUser + " está conectado.");
+                log(newUser + " está activo");
+
+                // Se añade la dirección IP a la lista address
+                clientAddresses.add(packet.getAddress());
 
                 // Se añade el puerto del cliente a la lista users
                 users.add(packet.getPort());
 
-                // Se añade la dirección IP a la lista address
-                address = packet.getAddress();
+                // Modificar para reenviar el mensaje de inicialización a todos los usuarios conectados
+                for (int forwardPort : users) {
+                    if (forwardPort != packet.getPort()) {
+                        // Construye un nuevo paquete que contiene el mensaje de inicialización y está destinado al
+                        // cliente actual
+                        byte[] activeUser = (newUser + " ha entrado al chat!").getBytes();
+                        DatagramPacket forward =
+                                new DatagramPacket(activeUser, activeUser.length, packet.getAddress(), forwardPort);
+
+                        try {
+                            // Envia el paquete al cliente a través del socket del servidor
+                            socket.send(forward);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
             }
 
 
@@ -170,15 +219,13 @@ public class Server extends Application {
                 log("Mensaje de imagen recibido: " + message);
 
                 // Llama al método handleImageMessage() para manejar el mensaje de imagen
-                handleImageMessage(packet);
+                //receiveImage(packet, socket);
             }
 
             // Si no es ninguna de las anteriores se asume que es un mensaje de texto normal
             else {
                 // Reenvía el mensaje a todos los clientes conectados menos al remitente
                 forwardTextMessage(packet);
-
-                // Se registra el mensaje en el área de registro del servidor
                 log(message);
             }
         }
@@ -197,71 +244,62 @@ public class Server extends Application {
     // Maneja la validacion de nombres de usuarios cuando un cliente solicita unirse
     private void handleValidation(String requestedUsername, InetAddress address, int port) {
 
-        // Si la lista registeredUsernames contiene el nombre de usuario envia que no es valido
+        // Si la lista registeredUsernames contiene el nombre de usuario, envía que no es válido
         if (registeredUsernames.contains(requestedUsername)) {
             // Enviar mensaje al cliente indicando que el Nick no es válido
             sendMessage("invalid", address, port);
+
+            log("Nick de usuario en uso: " + requestedUsername +
+                    "\nSe solicita a cliente que introduzca nick alternativo");
         }
 
-        // Si la lista registeredUsernames no contiene el nombre de usuario envia que es valido
+        // Si la lista registeredUsernames no contiene el nombre de usuario, envía que es válido
         else {
-            // Enviar mensaje al cliente indicando que el Nick es válido
-            sendMessage("valid", address, port);
             // Registrar el Nick
             registeredUsernames.add(requestedUsername);
+
+            // Enviar mensaje al cliente indicando que el Nick es válido
+            sendMessage("valid", address, port);
+
+            // Solo imprimir el mensaje en el servidor si el Nick es válido
+            log("Usuario conectado correctamente: " + requestedUsername);
         }
     }
 
-    private void forwardTextMessage(DatagramPacket packet) {
 
-        // Obtiene el puerto del cliente que envio el mensaje
+    // Método para reenviar mensajes de texto a todos los clientes excepto al remitente
+    private void forwardTextMessage(DatagramPacket packet) {
+        // Si el socket está cerrado, no se realiza ningún reenvío
+        if (socket.isClosed()) {
+            return;
+        }
+
+        // Obtiene el puerto del remitente del paquete recibido
         int userPort = packet.getPort();
 
-        // Obtiene los datos del mensaje en forma de un array de bytes
+        // Obtiene los datos del paquete recibido como un arreglo de bytes
         byte[] byteMessage = packet.getData();
 
-        // Inicia un bucle que recorre todos los puertos de los clientes registrados en users
+        // Itera sobre los puertos de los usuarios conectados
         for (int forwardPort : users) {
-
-            // Verifica si el puerto actual (FORWARD_PORT) no es el mismo que el puerto del cliente que
-            // envió el mensaje
+            // Evita reenviar el mensaje al remitente original
             if (forwardPort != userPort) {
-
-                // Convierte los datos del mensaje en un texto
+                // Convierte los datos del paquete en una cadena de texto
                 String messageText = new String(byteMessage, 0, packet.getLength());
 
-                // Convierte el texto del mensaje en un array de bytes
+                // Convierte el texto del mensaje en un arreglo de bytes
                 byte[] formattedMessageBytes = messageText.getBytes();
 
-                //  Construye un nuevo paquete que contiene el mensaje formateado y está destinado al cliente actual
-                DatagramPacket forward = new DatagramPacket(formattedMessageBytes, formattedMessageBytes.length,
-                        address, forwardPort);
-
+                // Crea un nuevo paquete con el mensaje formateado y lo envía al usuario correspondiente
+                DatagramPacket forward =
+                        new DatagramPacket(formattedMessageBytes, formattedMessageBytes.length, packet.getAddress(), forwardPort);
                 try {
-
-                    // Envia el paquete al cliente a traves del socket del servidor
                     socket.send(forward);
                 } catch (IOException e) {
-                    throw new RuntimeException(e);
+                    // Maneja la excepción según tus necesidades (por ejemplo, regístrala)
+                    e.printStackTrace();
                 }
             }
-        }
-    }
-
-    private void handleImageMessage(DatagramPacket packet) {
-        int userPort = packet.getPort();
-        byte[] imageData = new byte[packet.getLength()];
-        System.arraycopy(packet.getData(), 0, imageData, 0, packet.getLength());
-
-        // Guardar la imagen en la carpeta Descargas
-        String fileName = "C:\\Users\\danie\\Downloads" + System.currentTimeMillis() + ".png";
-        Path imagePath = Path.of(fileName);
-
-        try {
-            Files.write(imagePath, imageData);
-            log("Imagen guardada en: " + fileName);
-        } catch (IOException e) {
-            log("Error al guardar la imagen: " + e.getMessage());
         }
     }
 

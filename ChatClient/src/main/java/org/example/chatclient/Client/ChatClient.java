@@ -5,13 +5,18 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.text.TextFlow;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
@@ -19,64 +24,70 @@ import java.io.File;
 import java.io.IOException;
 import java.net.*;
 import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.Scanner;
+import java.util.Base64;
 
+/**
+ * Esta clase representa el cliente de chat de la aplicacion. Extiende la clase Application de JavaFX
+ * para proporcionar una interfaz grafica de usuario.
+ */
 public class ChatClient extends Application {
 
-    // Creacion de un objeto DatagramSocket (socket) para la comunicacion UDP
+    // Declara un objeto DatagramSocket para la comunicacion con el servidor
     private static final DatagramSocket socket;
 
-    // Puerto en el cual el servidor espera recibir mensajes de este cliente
+    // Puerto del servidor
     private static final int SERVER_PORT = 5010;
 
-    // Puerto en el cual este cliente espera recibir mensajes del servidor
+    // Puerto del cliente
     private static final int CLIENT_PORT = 6010;
 
-    // Variable para almacenar la direccion IP del servidor
-    private static final InetAddress address;
-
-    // Bloque estatico, que se ejecuta una sola vez cuando la clase es cargada
     static {
         try {
-
-            // Creacion de un objeto DatagramSocket y asignacion a la variable socket.
-            // Inicializa un socket UDP en el lado del cliente, que se utilizara para enviar
-            // y recibir datagramas (paquetes de datos) a traves de la red utilizando el protocolo UDP
-            socket = new DatagramSocket();
+            socket = new DatagramSocket(); // Crea un nuevo socket DatagramSocket
             //socket = new DatagramSocket(CLIENT_PORT);
         } catch (SocketException e) {
             throw new RuntimeException(e);
         }
     }
 
-    // Inicializacion estatica para asegurar que la variable se inicialice antes de su uso
+    // Declara una direccion IP
+    private static final InetAddress address;
+
     static {
         try {
-            //address = InetAddress.getByName("13.80.252.23");
 
-            // Crear un objeto InetAddress con la direccion IP del servidor
+            // Direccion IP del servidor
+            //address = InetAddress.getByName("13.80.252.23");
             address = InetAddress.getByName("localhost");
         } catch (UnknownHostException e) {
             throw new RuntimeException(e);
         }
     }
 
-    // Area de texto para mostrar los mensajes
+    // Declara un area de texto para mensajes
     private static final TextArea messageArea = new TextArea();
 
-    // Caja de texto para la entrada de mensajes
+    // Declara un campo de texto para entrada de usuario
     private static final TextField inputBox = new TextField();
 
-    // Botón para enviar mensajes de texto
+    // Declara un boton para enviar mensajes de texto
     private Button sendButton;
 
-    // Botón para enviar fotos
+    // Declara un boton para enviar fotos
     private Button sendPhotoButton;
 
-
-    // Variable para almacenar el nombre de usuario del cliente
+    // Declara una variable para almacenar el nombre de usuario
     private static String username;
 
+
+    /**
+     * Metodo principal para iniciar la aplicacion del cliente de chat.
+     * @param args Los argumentos de la linea de comandos.
+     * @throws IOException Si ocurre un error de entrada/salida al interactuar con el socket.
+     */
     public static void main(String[] args) throws IOException {
 
         Scanner sc = new Scanner(System.in);
@@ -84,101 +95,180 @@ public class ChatClient extends Application {
 
         username = sc.nextLine();
 
-        // Validar que el nombre de usuario no esté en uso
+        // Continua solicitando un nombre de usuario hasta que sea valido
         while (!validateUsername(username)) {
             System.out.println("El nombre de usuario ya está en uso. Por favor, elija otro nombre.");
             username = sc.nextLine();
         }
 
-        // Crear un hilo para recibir mensajes del servidor
+        // Hilo para recibir mensajes
         ClientThread clientThread = new ClientThread(socket, messageArea);
+
+        // Inicia el hilo de cliente para recibir mensajes
         clientThread.start();
 
-        // Enviar un mensaje de inicialización al servidor
+        // Enviar mensaje de inicializacion al servidor
         byte[] uuid = ("init;" + username).getBytes();
+
+        // Convierte el nombre de usuario en bytes
         DatagramPacket initialize = new DatagramPacket(uuid, uuid.length, address, SERVER_PORT);
+
+        // Envia el paquete de inicializacion al servidor
         socket.send(initialize);
 
-        launch(); // launch GUI
+        launch();
 
     }
 
+    /**
+     * Valida el nombre de usuario consultando al servidor.
+     * @param username El nombre de usuario a validar.
+     * @return true si el nombre de usuario es valido, false de lo contrario.
+     */
     private static boolean validateUsername(String username) {
+
+        // Convierte el nombre de usuario en bytes
         byte[] validationRequest = ("validate;" + username).getBytes();
+
+        // Crea un nuevo paquete DatagramPacket para la validacion
         DatagramPacket validationPacket = new DatagramPacket(validationRequest, validationRequest.length, address, SERVER_PORT);
 
         try {
+
+            // Envía el paquete de validación al servidor
             socket.send(validationPacket);
 
-            // Esperar la respuesta del servidor
+            // Crea un bufer para almacenar la respuesta del servidor
             byte[] responseBuffer = new byte[1024];
+
+            // Crea un nuevo paquete DatagramPacket para la respuesta del servidor
             DatagramPacket responsePacket = new DatagramPacket(responseBuffer, responseBuffer.length);
+
+            // Recibe la respuesta del servidor
             socket.receive(responsePacket);
 
+            // Convierte la respuesta del servidor en una cadena
             String responseMessage = new String(responsePacket.getData(), 0, responsePacket.getLength());
+
+            // Devuelve true si el nombre de usuario es válido según la respuesta del servidor
             return responseMessage.equals("valid");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
+    /**
+     * Metodo llamado al iniciar la aplicacion.
+     * Configura la interfaz de usuario, incluyendo el area de mensajes, el campo de entrada de texto y los botones.
+     * Tambien establece los eventos para enviar mensajes cuando se presionan teclas o se hace clic en botones.
+     * @param primaryStage El escenario principal de la aplicación.
+     */
     @Override
     public void start(Stage primaryStage) {
+
+        // Establece el ancho maximo del area de mensajes
         messageArea.setMaxWidth(500);
+
+        // Hace que el area de mensajes no sea editable
         messageArea.setEditable(false);
+
+        // Establece el color de fondo del area de mensajes
         messageArea.setStyle("-fx-control-inner-background: #0FC2C0;");
 
+        // Establece el ancho máximo del campo de entrada de texto
         inputBox.setMaxWidth(400);
+
+        // Establece el color de fondo del campo de entrada de texto
         inputBox.setStyle("-fx-background-color: #0FC2C0;");
 
+        // Crea un boton con el texto "Enviar"
         sendButton = new Button("Enviar");
+
+        // Crea un boton con el texto "Enviar Foto"
         sendPhotoButton = new Button("Enviar Foto");
+
+        // Establece el color de fondo del boton "Enviar"
         sendButton.setStyle("-fx-background-color: #0CABA8;");
+
+        // Establece el color de fondo del boton "Enviar Foto"
         sendPhotoButton.setStyle("-fx-background-color: #0CABA8;");
 
+        // Establece el ancho minimo del boton "Enviar"
         sendButton.setMinWidth(100);
+
+        // Establece el ancho minimo del boton "Enviar Foto"
         sendPhotoButton.setMinWidth(100);
 
+        // Define un evento al presionar una tecla en el campo de entrada de texto
         inputBox.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ENTER) {
-                sendMessage();
+                sendMessage(); // Llama al metodo sendMessage() al presionar la tecla Enter
             }
         });
 
+        // Define un evento al hacer clic en el boton "Enviar" para llamar al metodo sendMessage()
         sendButton.setOnAction(event -> sendMessage());
-        sendPhotoButton.setOnAction(event -> sendPhoto());
 
-        // Create an HBox to hold the TextField and Buttons
+        // Crea un contenedor HBox para organizar el campo de entrada de texto y los botones horizontalmente
         HBox inputContainer = new HBox(10, inputBox, sendButton, sendPhotoButton);
+
+        // Establece el ancho máximo del contenedor HBox
         inputContainer.setMaxWidth(500);
 
-        // Set Hgrow for TextField to make it expand
+        // Establece la prioridad de crecimiento del campo de entrada de texto para expandirse horizontalmente
         HBox.setHgrow(inputBox, Priority.ALWAYS);
 
-        // Create a BorderPane and set the content in the center
+        // Crea un contenedor BorderPane y coloca el contenido en el centro
         BorderPane root = new BorderPane();
+
+        // Crea un contenedor VBox para organizar verticalmente el área de mensajes y el contenedor de entrada
         root.setCenter(new VBox(35, messageArea, inputContainer));
+
+        // Establece los margenes del contenedor BorderPane
         root.setPadding(new Insets(20));
 
+        // Establece el color de fondo del contenedor BorderPane
         root.setStyle("-fx-background-color: #015958;");
 
-        // put everything on screen
+        // Crea una escena con el contenedor BorderPane y el tamaño especificado
         Scene scene = new Scene(root, 550, 300);
+
+        // Establece la escena en el escenario principal
         primaryStage.setScene(scene);
+
+        // Muestra el escenario principal en la pantalla
         primaryStage.show();
     }
 
+    /**
+     * Envia un mensaje al servidor.
+     * El mensaje se recupera del campo de entrada de texto, se formatea agregando el nombre de usuario
+     * y luego se muestra en el area de mensajes. Luego, el mensaje se convierte en un arreglo de bytes
+     * y se envia al servidor a traves de un DatagramPacket.
+     */
     private void sendMessage() {
+
+        // Obtiene el texto del campo de entrada y elimina los espacios en blanco al principio y al final
         String messageText = inputBox.getText().trim();
+
+        // Verifica si el mensaje no esta vacio
         if (!messageText.isEmpty()) {
+
+            // Formatea el mensaje con el nombre de usuario y lo muestra en el area de mensajes
             String formattedMessage = username + ": " + messageText;
             messageArea.appendText(formattedMessage + "\n");
 
+            // Convierte el mensaje en un arreglo de bytes
             byte[] msg = (username + ": " + messageText).getBytes();
+
+            // Limpia el campo de entrada de texto después de enviar el mensaje
             inputBox.clear();
 
+            // Crea un DatagramPacket con el mensaje y lo envía al servidor
             DatagramPacket send = new DatagramPacket(msg, msg.length, address, SERVER_PORT);
+
             try {
+                // Envía el paquete a través del socket
                 socket.send(send);
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -186,54 +276,38 @@ public class ChatClient extends Application {
         }
     }
 
-    private void sendPhoto() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Selecciona una imagen");
-        Stage stage = new Stage();
-        stage.initOwner(new Stage());
-
-        // Filtrar solo archivos de imagen
-        FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("Archivos de imagen", "*.png", "*.jpg", "*.gif");
-        fileChooser.getExtensionFilters().add(extFilter);
-
-        // Mostrar el cuadro de diálogo para elegir un archivo
-        File file = fileChooser.showOpenDialog(stage);
-
-        if (file != null) {
-            try {
-                // Leer la imagen como un arreglo de bytes
-                byte[] imageBytes = Files.readAllBytes(file.toPath());
-
-                // Enviar la imagen al servidor
-                DatagramPacket photoPacket = new DatagramPacket(imageBytes, imageBytes.length, address, SERVER_PORT);
-                socket.send(photoPacket);
-
-                // Puedes mostrar un mensaje en la interfaz del cliente indicando que la imagen fue enviada
-                String photoMessage = username + ": Imagen enviada: " + file.getName();
-                messageArea.appendText(photoMessage + "\n");
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
+    /**
+     * Envia un mensaje de desconexion al servidor.
+     * Crea un mensaje de desconexion concatenando "disconnect;" con el nombre de usuario,
+     * lo convierte en un arreglo de bytes y lo envia al servidor a traves de un DatagramPacket.
+     * Este mensaje se utiliza para notificar al servidor que el usuario se esta desconectando.
+     */
     private void sendDisconnectMessage() {
-        // Envia un mensaje de desconexión al servidor
+        // Crea un mensaje de desconexión concatenando "disconnect;" con el nombre de usuario
         byte[] disconnectMessage = ("disconnect;" + username).getBytes();
+
+        // Crea un DatagramPacket con el mensaje de desconexión y la dirección del servidor
         DatagramPacket disconnectPacket = new DatagramPacket(disconnectMessage, disconnectMessage.length, address, SERVER_PORT);
 
         try {
+            // Envía el paquete al servidor
             socket.send(disconnectPacket);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
+    /**
+     * Se llama cuando la aplicación se cierra.
+     * Este metodo envia un mensaje de desconexion al servidor utilizando el metodo sendDisconnectMessage().
+     * Ademas, cierra la plataforma JavaFX utilizando Platform.exit().
+     */
     @Override
     public void stop() {
-        // Este método se llama cuando la aplicación se cierra
+        // Envía un mensaje de desconexión al servidor
         sendDisconnectMessage();
-        // Puedes agregar más lógica aquí según sea necesario
+
+        // Cierra la plataforma JavaFX
         Platform.exit();
     }
 }
