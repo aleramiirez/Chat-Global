@@ -82,6 +82,9 @@ public class Server extends Application {
         log("Servidor iniciado en el puerto " + PORT);
         System.out.println("Servidor iniciado en el puerto " + PORT);
 
+        // Establece el color de fondo del TextArea a negro y el color de texto a amarillo
+        logTextArea.setStyle("-fx-control-inner-background: black; -fx-text-fill: yellow;");
+
         // Se ejecuta un hilo para poder atender a multiples clientes simultaneamente sin bloquearse
         Thread serverThread = new Thread(this::runServer);
 
@@ -140,11 +143,11 @@ public class Server extends Application {
                 // Se establece el latch para permitir que los hilos completen sus operaciones
                 shutdownLatch.countDown();
 
-                // Se para el servidor
-                stopServer();
-
                 // Se cierra la aplicación
                 Platform.exit();
+
+                // Se para el servidor
+                stopServer();
             }
 
             // Si el mensaje comienza con validate; valida que el nombre de usuario no esté registrado en el chat
