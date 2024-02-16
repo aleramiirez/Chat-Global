@@ -14,6 +14,12 @@ import java.util.concurrent.CountDownLatch;
 
 /**
  * Esta clase implementa un servidor de chat simple utilizando DatagramSocket.
+ * El servidor escucha por mensajes de los clientes y los reenvía a otros clientes conectados.
+ * Además, gestiona la validación de nombres de usuario y maneja la entrada y salida de mensajes.
+ *
+ * El servidor utiliza DatagramSocket para la comunicación a través de datagramas UDP.
+ * Cuando se inicia, muestra un TextArea en una ventana de JavaFX para registrar los mensajes
+ * recibidos y enviados.
  *
  * @author Alejandro Ramírez
  */
@@ -43,10 +49,20 @@ public class Server extends Application {
     // Almacena la direccion IP del cliente cuando se inicia la comunicacion
     private static List<InetAddress> clientAddresses = new ArrayList<>();
 
+    /**
+     * Método principal que inicia la aplicación.
+     *
+     * @param args Argumentos de la línea de comandos (no utilizado)
+     */
     public static void main(String[] args) {
         launch(args);
     }
 
+    /**
+     * Método que configura la interfaz gráfica del servidor y lo inicia.
+     *
+     * @param primaryStage El escenario principal de la aplicación de JavaFX.
+     */
     @Override
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Server");
