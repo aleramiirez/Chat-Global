@@ -9,12 +9,14 @@ import javafx.stage.Stage;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 
-
+/**
+ * Esta clase implementa un servidor de chat simple utilizando DatagramSocket.
+ *
+ * @author Alejandro Ramírez
+ */
 public class Server extends Application {
 
     // Puerto en el cual el servidor esta escuchando
@@ -63,6 +65,9 @@ public class Server extends Application {
         primaryStage.setOnCloseRequest(event -> stopServer());
     }
 
+    /**
+     * Inicia el servidor en el puerto especificado.
+     */
     private void startServer() {
         try {
 
@@ -87,6 +92,9 @@ public class Server extends Application {
         serverThread.start();
     }
 
+    /**
+     * Detiene el servidor y libera los recursos asociados.
+     */
     private void stopServer() {
         if (socket != null && !socket.isClosed()) {
             // Se establece el latch para permitir que los hilos completen sus operaciones
@@ -101,6 +109,9 @@ public class Server extends Application {
         }
     }
 
+    /**
+     * Bucle principal del servidor que escucha por mensajes de los clientes.
+     */
     private void runServer() {
         // Se crea un arreglo de bytes con una capacidad de 1024 bytes para almacenar los datos recibidos.
         byte[] incomingData = new byte[1024];
@@ -232,7 +243,11 @@ public class Server extends Application {
     }
 
 
-    // Registra mensajes en el area de registro del servidor
+    /**
+     * Registra un mensaje en el área de registro del servidor.
+     *
+     * @param message El mensaje a registrar.
+     */
     private void log(String message) {
 
         // Se utiliza Platform.runLater() para ejecutar la actualizacion de la interfaz de usuario en el hilo
@@ -241,7 +256,13 @@ public class Server extends Application {
         Platform.runLater(() -> logTextArea.appendText(message + "\n"));
     }
 
-    // Maneja la validacion de nombres de usuarios cuando un cliente solicita unirse
+    /**
+     * Valida un nombre de usuario solicitado por un cliente.
+     *
+     * @param requestedUsername El nombre de usuario a validar.
+     * @param address La dirección IP del cliente.
+     * @param port El puerto del cliente.
+     */
     private void handleValidation(String requestedUsername, InetAddress address, int port) {
 
         // Si la lista registeredUsernames contiene el nombre de usuario, envía que no es válido
@@ -267,7 +288,11 @@ public class Server extends Application {
     }
 
 
-    // Método para reenviar mensajes de texto a todos los clientes excepto al remitente
+    /**
+     * Reenvía un mensaje de texto a todos los clientes excepto al remitente.
+     *
+     * @param packet El paquete que contiene el mensaje.
+     */
     private void forwardTextMessage(DatagramPacket packet) {
         // Si el socket está cerrado, no se realiza ningún reenvío
         if (socket.isClosed()) {
@@ -303,7 +328,13 @@ public class Server extends Application {
         }
     }
 
-    // Se utiliza para enviar mensajes desde el servidor a un cliente especifico
+    /**
+     * Envía un mensaje a un cliente específico.
+     *
+     * @param message El mensaje a enviar.
+     * @param address La dirección IP del cliente.
+     * @param port El puerto del cliente.
+     */
     private void sendMessage(String message, InetAddress address, int port) {
 
         // Convierte el mensaje de texto en un array de bytes

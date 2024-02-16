@@ -8,6 +8,8 @@ import java.net.DatagramSocket;
 
 /**
  * Esta clase representa un hilo de cliente que recibe mensajes del servidor y los muestra en un TextArea.
+ *
+ * @author Alejandro Ramírez
  */
 public class ClientThread extends Thread {
 

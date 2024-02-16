@@ -32,6 +32,8 @@ import java.util.Base64;
 /**
  * Esta clase representa el cliente de chat de la aplicacion. Extiende la clase Application de JavaFX
  * para proporcionar una interfaz grafica de usuario.
+ *
+ * @author Alejandro Ramírez
  */
 public class ChatClient extends Application {
 
